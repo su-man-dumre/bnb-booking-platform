@@ -1,104 +1,123 @@
-const express = require("express");
-const app = express();
-const mongoose = require("mongoose");
-const Listing = require("./models/listing.js");
-const path = require("path");
-const methodOverride = require("method-override");
-const ejsMate = require("ejs-mate");
-const wrapAsync = require("./utils/wrapasync.js");
-const ExpressError = require("./utils/expressError.js");
+const express= require('express');
+const app= express();
+const mongoose = require('mongoose');
+const Listing = require('./models/listing.js');
+const path = require('path');
+const methodOverride = require('method-override');
+const ejsMate = require('ejs-mate');
+const wrapAsync = require('./utils/wrapAsync.js');
+const ExpressError = require('./utils/ExpressError.js');
+const {listingSchema} = require('./schema.js');
 
-const MONGO_URL = "mongodb://127.0.0.1:27017/wanderlust";
-
-main()
-  .then(() => console.log("Connected to MongoDB successfully"))
-  .catch(err => console.log(err));
-
+const MONGO_URL="mongodb://127.0.0.1:27017/wanderlust";
+main().then(()=>{
+  console.log("connected to db");
+}).catch((err)=>{
+  console.log(err);
+});
 async function main() {
   await mongoose.connect(MONGO_URL);
 }
 
-// ------------------- App Config -------------------
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-app.engine("ejs", ejsMate);
+app.set("view engine","ejs");
+app.set("views",path.join(__dirname,"/views"));
+app.use(express.urlencoded({extended:true}));
+app.use(methodOverride('_method'));
+app.engine('ejs', ejsMate);
+app.use(express.static(path.join(__dirname,'/public')));
 
-app.use(express.urlencoded({ extended: true }));
-app.use(methodOverride("_method"));
-app.use(express.static(path.join(__dirname, "Public")));
 
-// ------------------- ROUTES -------------------
-
-// Home
-app.get("/", (req, res) => {
-  res.send("Hello, Wanderlust App!");
+app.get('/',(req,res)=>{
+  res.send("hi there");
+});
+const validateListing=(req,res,next)=>{
+  let {error}=listingSchema.validate(req.body);
+ 
+  if(error){
+    
+    throw new ExpressError(400,error.details.map((el)=>el.message).join(","));
+  }else{
+    next();
+  }
+};
+//index route to show all listings
+app.get('/listings',async(req,res)=>{
+  const allListings= await Listing.find({})
+  res.render("./listings/index.ejs",{allListings});
 });
 
-// New Route (must be BEFORE /:id)
-app.get("/listings/new", (req, res) => {
-  res.render("listings/new.ejs");
+//new route
+app.get('/listings/new',(req,res)=>{
+  res.render("./listings/new.ejs");
 });
 
-// Index Route
-app.get("/listings", wrapAsync(async (req, res) => {
-  const allListing = await Listing.find({});
-  res.render("listings/index.ejs", { allListing });
-}));
-
-// Create Route
-app.post("/listings", wrapAsync(async (req, res) => {
-  const newListing = new Listing(req.body.listing);
-  await newListing.save();
-  res.redirect("/listings");
-}));
-
-// Show Route
-app.get("/listings/:id", wrapAsync(async (req, res) => {
-  const { id } = req.params;
+//show route
+app.get('/listings/:id',wrapAsync(async(req,res)=>{
+  const {id} = req.params;
   const listing = await Listing.findById(id);
-  if (!listing) throw new ExpressError(404, "Page Not Found");
-  res.render("listings/show.ejs", { listing });
+  res.render("./listings/show.ejs",{listing});
 }));
 
-// Edit Route
-app.get("/listings/:id/edit", wrapAsync(async (req, res) => {
-  const { id } = req.params;
+//create route
+app.post('/listings',validateListing,wrapAsync(async(req,res,next)=>{
+  let result=listingSchema.validate(req.body);
+  console.log(result);
+  if(result.err){
+    throw new ExpressError(400,result.err);
+  }
+    const newListing = new Listing(req.body.listing);
+    await newListing.save();
+    res.redirect("/listings");
+})
+);
+
+//edit route
+app.get('/listings/:id/edit',wrapAsync(async(req,res)=>{
+  const {id} = req.params;
   const listing = await Listing.findById(id);
-  if (!listing) throw new ExpressError(404, "Page Not Found");
-  res.render("listings/edit.ejs", { listing });
+  res.render("listings/edit.ejs",{listing});
 }));
 
-// Update Route
-app.put("/listings/:id/edit", wrapAsync(async (req, res) => {
-  const { id } = req.params;
-  const listing = await Listing.findByIdAndUpdate(id, { ...req.body.listing });
-  if (!listing) throw new ExpressError(404, "Page Not Found");
+//update route
+app.put('/listings/:id',validateListing,wrapAsync(async(req,res)=>{
+  
+  const {id} = req.params;
+  await Listing.findByIdAndUpdate(id,{...req.body.listing});
   res.redirect(`/listings/${id}`);
 }));
 
-// Delete Route
-app.delete("/listings/:id", wrapAsync(async (req, res) => {
-  const { id } = req.params;
-  const deletedListing = await Listing.findByIdAndDelete(id);
-  if (!deletedListing) throw new ExpressError(404, "Page Not Found");
-  res.redirect("/listings");
+//delete route
+app.delete('/listings/:id',wrapAsync(async(req,res)=>{
+  const {id} = req.params;
+  let deletedListing = await Listing.findByIdAndDelete(id);
+  console.log(deletedListing);
+  res.redirect('/listings');
 }));
 
-// ------------------- 404 Handler -------------------
-app.use((req, res, next) => {
-  next(new ExpressError(404, "Page Not Found"));
+// app.get('/testlistings' ,async(req,res)=>{
+//   let sampleListing= new Listing({
+//     title:"Porche 911",
+//     description:"A beautiful sports car",
+//     price:150000,
+//     location:"Pokhara",
+//     country:"Nepal"
+//   });
+//   await sampleListing.save();
+//   res.send("Listing saved");
+//   console.log("successfully saved");
+// });
+
+app.use((req,res,next)=>{
+  next(new ExpressError(404,"page not found"));
 });
 
-// ------------------- Error Handling Middleware -------------------
+
 app.use((err, req, res, next) => {
   const { statusCode = 500, message = "Something went wrong" } = err;
-  if (statusCode === 404) {
-    return res.status(404).render("error.ejs", { message });
-  }
-  res.status(statusCode).send(message);
+  res.status(statusCode).render("error.ejs", { message });
 });
 
-// ------------------- SERVER -------------------
-app.listen(3000, () => {
+
+app.listen(3000,()=>{
   console.log("Server is running on port 3000");
 });

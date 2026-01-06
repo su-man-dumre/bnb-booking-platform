@@ -94,3 +94,38 @@ margin-bottom: 2rem;
   padding-left:0;
   padding-right: 0;
 }
+/* Review Cards */
+.review-card {
+  border-radius: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.review-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+/* Star Ratings */
+.review-card .text-warning {
+  font-size: 1.1rem;
+}
+
+.review-card .text-muted {
+  font-size: 1.1rem;
+}
+
+/* Review Form */
+form .form-range {
+  width: 100%;
+}
+
+form textarea {
+  resize: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .row.row-cols-md-2 {
+    row-gap: 1rem;
+  }
+}
